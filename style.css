@@ -1,237 +1,241 @@
-/* ======================
-   RESET
-====================== */
-* {
-  box-sizing: border-box;
+let page = 1;
+let searchPage = 1;
+const limit = 12;
+
+let totalPages = 1;
+let iiifBaseUrl = "";
+let isSearching = false;
+let searchTimer;
+
+/* =========================
+   LOAD DATA
+========================= */
+async function loadData(reset = false) {
+  const keyword = searchInput.value.trim().toLowerCase();
+  const artist = artistFilter.value;
+  const sort = sortOrder.value;
+
+  if (reset) {
+    gallery.innerHTML = "";
+    page = 1;
+    searchPage = 1;
+  }
+
+  isSearching = keyword.length > 0;
+
+  try {
+    let url = "";
+
+    if (isSearching) {
+      url = `https://api.artic.edu/api/v1/artworks?page=${searchPage}&limit=100&fields=id,title,artist_title,image_id,date_display,medium_display`;
+    } else {
+      url = `https://api.artic.edu/api/v1/artworks?page=${page}&limit=${limit}&fields=id,title,artist_title,image_id,date_display,medium_display`;
+    }
+
+    const res = await fetch(url);
+    const json = await res.json();
+    iiifBaseUrl = json.config.iiif_url;
+
+    let data = json.data;
+
+    /* =========================
+       POPULATE ARTIST FILTER
+    ========================= */
+    populateArtistFilter(data);
+
+    /* =========================
+       SEARCH (HURUF AWAL)
+    ========================= */
+    if (isSearching) {
+      data = data.filter(item =>
+        item.title &&
+        item.title.toLowerCase().startsWith(keyword)
+      );
+
+      loadMoreBtn.style.display = "block";
+      document.querySelector(".pagination").style.display = "none";
+    } else {
+      totalPages = json.pagination.total_pages;
+      loadMoreBtn.style.display = "none";
+      document.querySelector(".pagination").style.display = "block";
+    }
+
+    /* =========================
+       FILTER ARTIST
+    ========================= */
+    if (artist) {
+      data = data.filter(item => item.artist_title === artist);
+    }
+
+    /* =========================
+       SORT ASC / DESC
+    ========================= */
+    data.sort((a, b) =>
+      sort === "asc"
+        ? a.title.localeCompare(b.title)
+        : b.title.localeCompare(a.title)
+    );
+
+    renderAppend(data);
+
+    pageInfo.innerText = isSearching
+      ? "Hasil pencarian"
+      : `Page ${page} of ${totalPages}`;
+
+  } catch (err) {
+    console.error("API ERROR:", err);
+  }
 }
 
-:root {
-  --bg: #fafafa;
-  --card: #ffffff;
-  --text: #111;
-  --text-soft: #666;
-  --border: #ddd;
+/* =========================
+   POPULATE ARTIST DROPDOWN
+========================= */
+function populateArtistFilter(data) {
+  const artists = [...new Set(
+    data.map(item => item.artist_title).filter(Boolean)
+  )];
+
+  artistFilter.innerHTML = `<option value="">Semua Artist</option>`;
+
+  artists.sort().forEach(artist => {
+    const opt = document.createElement("option");
+    opt.value = artist;
+    opt.textContent = artist;
+    artistFilter.appendChild(opt);
+  });
 }
 
-body {
-  margin: 0;
-  font-family: system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
+/* =========================
+   RENDER CARD
+========================= */
+function renderAppend(data) {
+  if (!data.length && gallery.innerHTML === "") {
+    gallery.innerHTML = "<p style='text-align:center'>Tidak ada hasil</p>";
+    return;
+  }
+
+  data.forEach(item => {
+    const imgCard = item.image_id
+      ? `${iiifBaseUrl}/${item.image_id}/full/600,/0/default.jpg`
+      : "https://via.placeholder.com/400x500";
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <div class="art-image">
+        <img src="${imgCard}" loading="lazy">
+      </div>
+      <div class="art-info">
+        <h3>${item.title}</h3>
+        <p class="artist">${item.artist_title || "-"}</p>
+        <button class="detail-btn">Detail</button>
+      </div>
+    `;
+
+    card.querySelector("img").onclick = () => showDetail(item);
+    card.querySelector(".detail-btn").onclick = () => showDetail(item);
+
+    gallery.appendChild(card);
+  });
 }
 
-/* ======================
-   NAVBAR
-====================== */
-.navbar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: var(--bg);
-  color: var(--text);
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--border);
+/* =========================
+   MODAL DETAIL
+========================= */
+function showDetail(item) {
+  const imgHD = item.image_id
+    ? `${iiifBaseUrl}/${item.image_id}/full/max/0/default.jpg`
+    : "";
+
+  modal.style.display = "block";
+  document.body.style.overflow = "hidden";
+
+  modalBody.innerHTML = `
+    <img src="${imgHD}" style="width:100%;max-height:70vh;object-fit:contain">
+    <h3>${item.title}</h3>
+    <p><b>Artist:</b> ${item.artist_title || "-"}</p>
+    <p><b>Date:</b> ${item.date_display || "-"}</p>
+    <p><b>Medium:</b> ${item.medium_display || "-"}</p>
+  `;
 }
 
-.nav-brand {
-  grid-column: 2;
-  justify-self: center;
-  font-weight: 700;
-  font-size: 30px;
+function closeModal() {
+  modal.style.display = "none";
+  document.body.style.overflow = "auto";
 }
 
-.theme-btn {
-  border: none;
-  background: none;
-  font-size: 20px;
-  cursor: pointer;
-  justify-self: end;
-}
-
-/* ======================
-JARAK NAVBAR KE CONTROLS
-====================== */
-.navbar + .controls {
-  margin-top: 32px; /* atur 24–40px sesuai selera */
-}
-
-/* ======================
-   TITLE (FIX CENTER)
-====================== */
-h1 {
-  text-align: center;
-  max-width: 1200px;
-  margin: 24px auto 14px;
-  padding: 0 16px;
-  font-weight: 600;
-}
-
-/* ======================
-   CONTROLS
-====================== */
-.controls {
-  max-width: 1200px;
-  margin: 0 auto 22px;
-  padding: 0 16px;
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.controls input,
-.controls select {
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--text);
-}
-
-/* ======================
-   GALLERY
-====================== */
-#gallery {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 16px 40px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 22px;
-}
-
-.card {
-  background: var(--card);
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 8px 20px rgba(0,0,0,.06);
-}
-
-/* IMAGE */
-.art-image {
-  aspect-ratio: 3 / 4;
-  background: #eaeaea;
-}
-
-.art-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* INFO */
-.art-info {
-  padding: 14px 16px;
-}
-
-.art-info h3 {
-  margin: 0 0 6px;
-  font-size: 15px;
-}
-
-.artist {
-  font-size: 13px;
-  color: var(--text-soft);
-  margin-bottom: 10px;
-}
-
-.detail-btn {
-  padding: 6px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: transparent;
-  cursor: pointer;
-  color: var(--text);
-}
-
-/* ======================
+/* =========================
    PAGINATION
-====================== */
-.pagination {
-  text-align: center;
-  margin-bottom: 20px;
+========================= */
+function nextPage() {
+  if (!isSearching) {
+    page++;
+    gallery.innerHTML = "";
+    loadData();
+  }
 }
 
-.pagination button {
-  padding: 6px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  cursor: pointer;
-  color: var(--text);
+function prevPage() {
+  if (!isSearching && page > 1) {
+    page--;
+    gallery.innerHTML = "";
+    loadData();
+  }
 }
 
-/* ======================
-   LOAD MORE
-====================== */
-#loadMoreBtn {
-  display: none;
-  margin: 0 auto 40px;
-  padding: 8px 18px;
-  border-radius: 20px;
-  border: none;
-  background: #111;
-  color: #fff;
-  cursor: pointer;
+/* =========================
+   LOAD MORE (SEARCH)
+========================= */
+function loadMoreSearch() {
+  searchPage++;
+  loadData();
 }
 
-/* ======================
-   MODAL
-====================== */
-#modal {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.6);
-  z-index: 999;
+/* =========================
+   EVENT LISTENER
+========================= */
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    loadData(true);
+  }, 400);
+});
+
+artistFilter.addEventListener("change", () => {
+  loadData(true);
+});
+
+sortOrder.addEventListener("change", () => {
+  loadData(true);
+});
+
+/* =========================
+   INIT
+========================= */
+loadData(true);
+
+/* =========================
+   DARK / LIGHT MODE
+========================= */
+const themeBtn = document.getElementById("themeToggle");
+
+function setTheme(mode) {
+  if (mode === "dark") {
+    document.body.classList.add("dark");
+    themeBtn.textContent = "☀️";
+  } else {
+    document.body.classList.remove("dark");
+    themeBtn.textContent = "🌙";
+  }
+  localStorage.setItem("theme", mode);
 }
 
-.modal-content {
-  background: var(--card);
-  color: var(--text);
-  width: 90%;
-  max-width: 900px;
-  max-height: 90vh;
-  margin: 5vh auto;
-  padding: 20px;
-  border-radius: 12px;
-  overflow-y: auto;
-  position: relative;
-}
+themeBtn.addEventListener("click", () => {
+  const isDark = document.body.classList.contains("dark");
+  setTheme(isDark ? "light" : "dark");
+});
 
-.close {
-  position: absolute;
-  top: 12px;
-  right: 16px;
-  cursor: pointer;
-  font-size: 20px;
-}
-
-/* ======================
-   FOOTER
-====================== */
-.footer {
-  text-align: center;
-  padding: 20px;
-  border-top: 1px solid var(--border);
-  color: var(--text-soft);
-}
-
-/* ======================
-   DARK MODE
-====================== */
-body.dark {
-  --bg: #0f0f0f;
-  --card: #1a1a1a;
-  --text: #f1f1f1;
-  --text-soft: #aaa;
-  --border: #333;
-}
-
-body.dark img {
-  filter: brightness(0.95);
-}
+// LOAD THEME SAAT AWAL
+const savedTheme = localStorage.getItem("theme") || "light";
+setTheme(savedTheme);
