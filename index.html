@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Galeri Seni Digital</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="nav-brand">Galeri Seni Digital</div>
+  <button id="themeToggle" class="theme-btn">🌙</button>
+</nav>
+
+
+
+<div class="controls">
+  <input id="searchInput" placeholder="Cari judul (huruf awal)">
+  <select id="artistFilter">
+    <option value="">Semua Artist</option>
+  </select>
+  <select id="sortOrder">
+    <option value="asc">A - Z</option>
+    <option value="desc">Z - A</option>
+  </select>
+</div>
+
+<div id="gallery"></div>
+
+<div class="pagination">
+  <button onclick="prevPage()">Prev</button>
+  <span id="pageInfo">Page 1</span>
+  <button onclick="nextPage()">Next</button>
+</div>
+
+<button id="loadMoreBtn" onclick="loadMoreSearch()">Load More</button>
+
+<!-- MODAL -->
+<div id="modal" onclick="closeModal()">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <span class="close" onclick="closeModal()">×</span>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <p>© 2025 Art Gallery — Vanilla JS</p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
